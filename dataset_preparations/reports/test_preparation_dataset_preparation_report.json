@@ -1,0 +1,170 @@
+{
+  "report_type": "Dataset Preparation Report",
+  "status": "COMPLETED",
+  "dataset": {
+    "input_file": "test_preparation_dataset.csv",
+    "output_file": "test_preparation_dataset_prepared.csv",
+    "input_format": "csv",
+    "output_format": "csv"
+  },
+  "dataset_overview": {
+    "rows_before": 8,
+    "rows_after": 7,
+    "columns_before": 4,
+    "columns_after": 4,
+    "file_size_before": 164,
+    "file_size_after": 183
+  },
+  "column_analysis": {
+    "before": [
+      {
+        "column": "name",
+        "type": "str",
+        "missing": 0,
+        "unique": 7
+      },
+      {
+        "column": "age",
+        "type": "float64",
+        "missing": 1,
+        "unique": 6
+      },
+      {
+        "column": "income",
+        "type": "float64",
+        "missing": 1,
+        "unique": 6
+      },
+      {
+        "column": "score",
+        "type": "float64",
+        "missing": 1,
+        "unique": 6
+      }
+    ],
+    "after": [
+      {
+        "column": "name",
+        "type": "str",
+        "missing": 0,
+        "unique": 7
+      },
+      {
+        "column": "age",
+        "type": "float64",
+        "missing": 1,
+        "unique": 6
+      },
+      {
+        "column": "income",
+        "type": "float64",
+        "missing": 1,
+        "unique": 6
+      },
+      {
+        "column": "score",
+        "type": "float64",
+        "missing": 1,
+        "unique": 6
+      }
+    ]
+  },
+  "data_quality": {
+    "before": {
+      "duplicates": 1,
+      "missing_values": 3,
+      "constant_columns": [],
+      "outliers": 0
+    },
+    "after": {
+      "duplicates": 0,
+      "missing_values": 3,
+      "constant_columns": [],
+      "outliers": 0
+    }
+  },
+  "preparation_operations": [
+    {
+      "operation": "remove_duplicates",
+      "parameters": {}
+    }
+  ],
+  "before_vs_after": {
+    "rows": {
+      "before": 8,
+      "after": 7
+    },
+    "columns": {
+      "before": 4,
+      "after": 4
+    },
+    "missing_values": {
+      "before": 3,
+      "after": 3
+    },
+    "duplicates": {
+      "before": 1,
+      "after": 0
+    },
+    "outliers": {
+      "before": 0,
+      "after": 0
+    }
+  },
+  "reproducibility": {
+    "input_file": "test_preparation_dataset.csv",
+    "input_fingerprint": "3f1a39b7b954a904351f27c5b4991fbca6a32083476a4f9b0f098bae0eb9f4a9",
+    "preparation_steps": [
+      {
+        "operation": "remove_duplicates",
+        "parameters": {}
+      }
+    ],
+    "output_fingerprint": "5cf11602d2a2d891dac1080a5c7c8d2c91c7b9db4f87135f621d8fea203ad6f5"
+  },
+  "output": {
+    "processed_dataset": "test_preparation_dataset_prepared.csv",
+    "format": "csv",
+    "preparation_status": "COMPLETED"
+  },
+  "ai_insights": {
+    "status": "success",
+    "summary": "The dataset preparation removed one duplicate row, reducing the row count from 8 to 7 and eliminating the single duplicate record. Column structure and data types remained unchanged, and the number of missing values stayed at three. No outliers or constant columns were present before or after preparation. The output file size increased from 164 to 183 bytes.",
+    "quality_assessment": "Duplicates were present before preparation and were fully removed, improving data quality in that aspect. Missing values remain unchanged, and no new quality issues (outliers, constant columns) were introduced.",
+    "changes_explained": [
+      {
+        "change": "Row count decreased from 8 to 7",
+        "explanation": "One duplicate row was removed, reducing the total number of rows."
+      },
+      {
+        "change": "Duplicate count decreased from 1 to 0",
+        "explanation": "The remove_duplicates operation eliminated the identified duplicate record."
+      },
+      {
+        "change": "Missing value count remained at 3",
+        "explanation": "The number of missing entries across all columns did not change."
+      },
+      {
+        "change": "File size increased from 164 to 183 bytes",
+        "explanation": "The output file is larger despite having fewer rows, as reported in the dataset overview."
+      }
+    ],
+    "recommendations": [
+      {
+        "recommendation": "Review the remaining missing values",
+        "reason": "Missing values persist after preparation",
+        "priority": "medium"
+      },
+      {
+        "recommendation": "Validate that the removed duplicate row was not required for downstream analysis",
+        "reason": "Row count changed due to duplicate removal",
+        "priority": "low"
+      },
+      {
+        "recommendation": "Confirm that the increase in file size is expected",
+        "reason": "File size grew despite fewer rows",
+        "priority": "low"
+      }
+    ]
+  }
+}

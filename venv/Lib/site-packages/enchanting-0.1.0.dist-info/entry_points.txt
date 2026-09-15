@@ -1,0 +1,2 @@
+[console_scripts]
+enchanting = app.cli.main:cli

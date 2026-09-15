@@ -1,0 +1,6 @@
+customer_id,name,age,income,active
+101,alice,25,45000.5,True
+102,bob,30,52000.0,False
+103,charlie,28,61000.75,True
+104,david,35,68000.0,False
+105,eva,31,57000.25,True

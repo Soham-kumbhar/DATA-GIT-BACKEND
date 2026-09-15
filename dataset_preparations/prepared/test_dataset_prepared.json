@@ -1,0 +1,26 @@
+[
+  {
+    "name":"Alice",
+    "age":25,
+    "income":45000.0,
+    "city":"Pune"
+  },
+  {
+    "name":"Bob",
+    "age":30,
+    "income":52000.0,
+    "city":"Mumbai"
+  },
+  {
+    "name":"Charlie",
+    "age":28,
+    "income":52000.0,
+    "city":"Pune"
+  },
+  {
+    "name":"David",
+    "age":35,
+    "income":68000.0,
+    "city":"Nagpur"
+  }
+]

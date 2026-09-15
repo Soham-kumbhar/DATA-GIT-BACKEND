@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datagit"
+version = "0.1.0"
+description = "ML-aware Git and DVC versioning tool"
+requires-python = ">=3.12"
+dependencies = [
+    "click",
+    "requests",
+]
+
+[project.scripts]
+DataGit = "app.cli.main:cli"
+enchanting = "app.cli.main:cli"

@@ -1,0 +1,7 @@
+name,age,income,score
+Alice,25,45000,80
+Bob,30,52000,85
+Charlie,,61000,90
+David,35,,88
+Eva,40,70000,95
+Frank,45,76000,

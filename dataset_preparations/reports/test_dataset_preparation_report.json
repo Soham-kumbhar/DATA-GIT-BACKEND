@@ -1,0 +1,190 @@
+{
+  "report_type": "Dataset Preparation Report",
+  "status": "COMPLETED",
+  "dataset": {
+    "input_file": "test_dataset.csv",
+    "output_file": "test_dataset_prepared.csv",
+    "input_format": "csv",
+    "output_format": "csv"
+  },
+  "dataset_overview": {
+    "rows_before": 5,
+    "rows_after": 4,
+    "columns_before": 4,
+    "columns_after": 4,
+    "file_size_before": 121,
+    "file_size_after": 118
+  },
+  "column_analysis": {
+    "before": [
+      {
+        "column": "name",
+        "type": "str",
+        "missing": 0,
+        "unique": 4
+      },
+      {
+        "column": "age",
+        "type": "int64",
+        "missing": 0,
+        "unique": 4
+      },
+      {
+        "column": "income",
+        "type": "float64",
+        "missing": 1,
+        "unique": 3
+      },
+      {
+        "column": "city",
+        "type": "str",
+        "missing": 0,
+        "unique": 3
+      }
+    ],
+    "after": [
+      {
+        "column": "name",
+        "type": "str",
+        "missing": 0,
+        "unique": 4
+      },
+      {
+        "column": "age",
+        "type": "int64",
+        "missing": 0,
+        "unique": 4
+      },
+      {
+        "column": "income",
+        "type": "float64",
+        "missing": 0,
+        "unique": 3
+      },
+      {
+        "column": "city",
+        "type": "str",
+        "missing": 0,
+        "unique": 3
+      }
+    ]
+  },
+  "data_quality": {
+    "before": {
+      "duplicates": 1,
+      "missing_values": 1,
+      "constant_columns": [],
+      "outliers": 0
+    },
+    "after": {
+      "duplicates": 0,
+      "missing_values": 0,
+      "constant_columns": [],
+      "outliers": 1
+    }
+  },
+  "preparation_operations": [
+    {
+      "operation": "remove_duplicates",
+      "parameters": {
+        "strategy": "keep_first"
+      }
+    },
+    {
+      "operation": "handle_missing",
+      "parameters": {
+        "columns": {
+          "income": "median"
+        }
+      }
+    }
+  ],
+  "before_vs_after": {
+    "rows": {
+      "before": 5,
+      "after": 4
+    },
+    "columns": {
+      "before": 4,
+      "after": 4
+    },
+    "missing_values": {
+      "before": 1,
+      "after": 0
+    },
+    "duplicates": {
+      "before": 1,
+      "after": 0
+    },
+    "outliers": {
+      "before": 0,
+      "after": 1
+    }
+  },
+  "reproducibility": {
+    "input_file": "test_dataset.csv",
+    "input_fingerprint": "ee43bf31415b5d00992f35e986a82ea53e66767fa45e097502f23b478ef94c5d",
+    "preparation_steps": [
+      {
+        "operation": "remove_duplicates",
+        "parameters": {
+          "strategy": "keep_first"
+        }
+      },
+      {
+        "operation": "handle_missing",
+        "parameters": {
+          "columns": {
+            "income": "median"
+          }
+        }
+      }
+    ],
+    "output_fingerprint": "816128928ca4e9a38a2157cf46dfbd06498bd980bdb0cb2c31a33c4af60a0959"
+  },
+  "output": {
+    "processed_dataset": "test_dataset_prepared.csv",
+    "format": "csv",
+    "preparation_status": "COMPLETED"
+  },
+  "ai_insights": {
+    "status": "success",
+    "summary": "The preparation reduced the dataset from 5 to 4 rows, eliminated 1 duplicate and 1 missing value, and introduced 1 outlier while keeping column count and types unchanged.",
+    "quality_assessment": "Data quality improved regarding duplicates and missing values, but the emergence of an outlier after preparation warrants attention.",
+    "changes_explained": [
+      {
+        "change": "Row count decreased from 5 to 4",
+        "explanation": "One row was removed during the preparation process."
+      },
+      {
+        "change": "Duplicate count decreased from 1 to 0",
+        "explanation": "The remove_duplicates operation eliminated the identified duplicate."
+      },
+      {
+        "change": "Missing value count decreased from 1 to 0",
+        "explanation": "The handle_missing operation filled the missing value in the income column using the median."
+      },
+      {
+        "change": "Outlier count increased from 0 to 1",
+        "explanation": "An outlier was detected after the preparation steps."
+      }
+    ],
+    "recommendations": [
+      {
+        "recommendation": "Investigate the outlier detected after preparation.",
+        "reason": "An outlier appeared post‑processing, which may affect downstream analysis.",
+        "priority": "high"
+      },
+      {
+        "recommendation": "Verify that the retained row after duplicate removal is the intended record.",
+        "reason": "Duplicate removal changed the row count; confirming the correct record was kept ensures data integrity.",
+        "priority": "medium"
+      },
+      {
+        "recommendation": "Review the median imputation applied to the income column.",
+        "reason": "Missing values were filled using the median; ensure this method is appropriate for the income distribution.",
+        "priority": "medium"
+      }
+    ]
+  }
+}
