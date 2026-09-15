@@ -129,41 +129,32 @@
   },
   "ai_insights": {
     "status": "success",
-    "summary": "The dataset preparation removed one duplicate row, reducing the row count from 8 to 7 and eliminating the single duplicate record. Column structure and data types remained unchanged, and the number of missing values stayed at three. No outliers or constant columns were present before or after preparation. The output file size increased from 164 to 183 bytes.",
-    "quality_assessment": "Duplicates were present before preparation and were fully removed, improving data quality in that aspect. Missing values remain unchanged, and no new quality issues (outliers, constant columns) were introduced.",
+    "summary": "The dataset preparation completed successfully. One duplicate row was removed, reducing the row count from 8 to 7. Column count and data types remained unchanged, and the number of missing values and outliers stayed the same.",
+    "quality_assessment": "After preparation, duplicate records are eliminated (0 duplicates). Missing values remain at 3 across the dataset, and no outliers are present. No constant columns were identified, and column metadata (type, missing count, unique count) is unchanged.",
     "changes_explained": [
       {
         "change": "Row count decreased from 8 to 7",
-        "explanation": "One duplicate row was removed, reducing the total number of rows."
+        "explanation": "The dataset lost one row during preparation."
       },
       {
         "change": "Duplicate count decreased from 1 to 0",
-        "explanation": "The remove_duplicates operation eliminated the identified duplicate record."
-      },
-      {
-        "change": "Missing value count remained at 3",
-        "explanation": "The number of missing entries across all columns did not change."
+        "explanation": "The duplicate removal operation eliminated the single duplicate record."
       },
       {
         "change": "File size increased from 164 to 183 bytes",
-        "explanation": "The output file is larger despite having fewer rows, as reported in the dataset overview."
+        "explanation": "The output file is larger despite having fewer rows."
       }
     ],
     "recommendations": [
       {
-        "recommendation": "Review the remaining missing values",
-        "reason": "Missing values persist after preparation",
+        "recommendation": "Investigate the remaining missing values",
+        "reason": "Missing values (3) persist after preparation and may affect downstream analysis.",
+        "priority": "high"
+      },
+      {
+        "recommendation": "Validate that the removed duplicate row was not required for analysis",
+        "reason": "Duplicate removal changed the row count; confirming that the removed record is truly redundant ensures data integrity.",
         "priority": "medium"
-      },
-      {
-        "recommendation": "Validate that the removed duplicate row was not required for downstream analysis",
-        "reason": "Row count changed due to duplicate removal",
-        "priority": "low"
-      },
-      {
-        "recommendation": "Confirm that the increase in file size is expected",
-        "reason": "File size grew despite fewer rows",
-        "priority": "low"
       }
     ]
   }

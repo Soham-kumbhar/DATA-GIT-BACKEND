@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.compare import router as compare_router
+
 from app.api.projects import router as projects_router
 from app.api.datasets import router as datasets_router
 from app.api.models import router as models_router
@@ -63,14 +63,6 @@ app = FastAPI(
 # ============================================================
 # CORS
 # ============================================================
-# Allow the React/Vite development server to communicate
-# with this FastAPI backend from a browser.
-#
-# Vite normally runs on:
-#   http://localhost:5173
-#   http://127.0.0.1:5173
-#
-# Keep origins explicit rather than using "*".
 
 app.add_middleware(
     CORSMiddleware,
@@ -124,8 +116,17 @@ app.include_router(
 # ============================================================
 # VERSION ROUTES
 #
-# Specific routes such as /compare, /history and /report
-# are registered before /versions/{version_id}.
+# The dedicated version comparison router already provides:
+#
+# GET
+# /projects/{project_id}/versions/compare
+#
+# with:
+#   version_1
+#   version_2
+#
+# Keep this route in the version-scoped API rather than creating
+# a second project-level comparison endpoint.
 # ============================================================
 
 app.include_router(
@@ -160,4 +161,3 @@ app.include_router(
 app.include_router(
     comparison_router
 )
-app.include_router(compare_router)
