@@ -1,10 +1,11 @@
+import logging
+
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
     Query,
 )
-
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -22,15 +23,14 @@ from app.services.version_comparison_service import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 router = APIRouter(
     prefix="/projects/{project_id}/versions",
     tags=["Version Comparison"],
 )
 
-
-# ============================================================
-# SINGLE VERSION COMPARISON
-# ============================================================
 
 @router.get(
     "/compare",
@@ -58,10 +58,6 @@ def compare_versions(
         )
 
     try:
-        # ----------------------------------------------------
-        # 1. DETERMINISTIC COMPARISON
-        # ----------------------------------------------------
-
         result = (
             VersionComparisonService.compare_versions(
                 db=db,
@@ -70,13 +66,6 @@ def compare_versions(
                 version_2=version_2,
             )
         )
-
-        # ----------------------------------------------------
-        # 2. AI INTERPRETATION
-        #
-        # AI receives ONLY the deterministic comparison.
-        # It does not become the source of truth.
-        # ----------------------------------------------------
 
         if generate_ai:
             result["ai_insights"] = (
@@ -103,23 +92,36 @@ def compare_versions(
         return result
 
     except ValueError as error:
+        logger.exception(
+            "Version comparison validation error "
+            "project_id=%s version_1=%s version_2=%s",
+            project_id,
+            version_1,
+            version_2,
+        )
+
         raise HTTPException(
             status_code=404,
             detail=str(error),
         ) from error
 
     except Exception as error:
+        logger.exception(
+            "Version comparison crashed "
+            "project_id=%s version_1=%s version_2=%s",
+            project_id,
+            version_1,
+            version_2,
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                "Version comparison failed."
+                f"Version comparison failed: "
+                f"{type(error).__name__}: {error}"
             ),
         ) from error
 
-
-# ============================================================
-# MULTI-VERSION COMPARISON
-# ============================================================
 
 @router.get(
     "/multi-report",
@@ -147,7 +149,6 @@ def multi_version_report(
             for value in versions.split(",")
             if value.strip()
         ]
-
     except ValueError as error:
         raise HTTPException(
             status_code=400,
@@ -161,15 +162,10 @@ def multi_version_report(
     if len(version_ids) < 2:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "At least two versions are required."
-            ),
+            detail="At least two versions are required.",
         )
 
-    if mode not in {
-        "evolution",
-        "baseline",
-    }:
+    if mode not in {"evolution", "baseline"}:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -189,15 +185,28 @@ def multi_version_report(
         )
 
     except ValueError as error:
+        logger.exception(
+            "Multi-version comparison validation error "
+            "project_id=%s",
+            project_id,
+        )
+
         raise HTTPException(
             status_code=404,
             detail=str(error),
         ) from error
 
     except Exception as error:
+        logger.exception(
+            "Multi-version comparison crashed "
+            "project_id=%s",
+            project_id,
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                "Multi-version comparison failed."
+                f"Multi-version comparison failed: "
+                f"{type(error).__name__}: {error}"
             ),
         ) from error
