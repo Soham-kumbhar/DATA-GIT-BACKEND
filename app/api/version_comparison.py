@@ -1,11 +1,6 @@
 import logging
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -24,6 +19,7 @@ from app.services.version_comparison_service import (
 
 
 logger = logging.getLogger(__name__)
+
 
 router = APIRouter(
     prefix="/projects/{project_id}/versions",
@@ -92,6 +88,7 @@ def compare_versions(
             version_1,
             version_2,
         )
+
         raise HTTPException(
             status_code=404,
             detail=str(error),
@@ -105,6 +102,7 @@ def compare_versions(
             version_1,
             version_2,
         )
+
         raise HTTPException(
             status_code=500,
             detail=(
@@ -114,7 +112,9 @@ def compare_versions(
         ) from error
 
 
-@router.get("/multi-report")
+@router.get(
+    "/multi-report",
+)
 def multi_version_report(
     project_id: int,
     versions: str = Query(...),
@@ -127,6 +127,7 @@ def multi_version_report(
             for value in versions.split(",")
             if value.strip()
         ]
+
     except ValueError as error:
         raise HTTPException(
             status_code=400,
@@ -145,7 +146,10 @@ def multi_version_report(
     if mode not in {"evolution", "baseline"}:
         raise HTTPException(
             status_code=400,
-            detail="Invalid mode. Use 'evolution' or 'baseline'.",
+            detail=(
+                "Invalid mode. "
+                "Use 'evolution' or 'baseline'."
+            ),
         )
 
     try:
@@ -162,6 +166,7 @@ def multi_version_report(
             "project_id=%s",
             project_id,
         )
+
         raise HTTPException(
             status_code=404,
             detail=str(error),
@@ -169,9 +174,11 @@ def multi_version_report(
 
     except Exception as error:
         logger.exception(
-            "Multi-version comparison crashed: project_id=%s",
+            "Multi-version comparison crashed: "
+            "project_id=%s",
             project_id,
         )
+
         raise HTTPException(
             status_code=500,
             detail=(
