@@ -25,7 +25,6 @@ from app.services.version_comparison_service import (
 
 logger = logging.getLogger(__name__)
 
-
 router = APIRouter(
     prefix="/projects/{project_id}/versions",
     tags=["Version Comparison"],
@@ -52,19 +51,15 @@ def compare_versions(
     if version_1 == version_2:
         raise HTTPException(
             status_code=422,
-            detail=(
-                "Version 1 and Version 2 must be different."
-            ),
+            detail="Version 1 and Version 2 must be different.",
         )
 
     try:
-        result = (
-            VersionComparisonService.compare_versions(
-                db=db,
-                project_id=project_id,
-                version_1=version_1,
-                version_2=version_2,
-            )
+        result = VersionComparisonService.compare_versions(
+            db=db,
+            project_id=project_id,
+            version_1=version_1,
+            version_2=version_2,
         )
 
         if generate_ai:
@@ -76,9 +71,7 @@ def compare_versions(
         else:
             result["ai_insights"] = {
                 "status": "disabled",
-                "reason": (
-                    "AI comparison generation was disabled."
-                ),
+                "reason": "AI comparison generation was disabled.",
                 "root_cause": {
                     "summary": "",
                     "contributors": [],
@@ -93,13 +86,12 @@ def compare_versions(
 
     except ValueError as error:
         logger.exception(
-            "Version comparison validation error "
+            "Version comparison validation error: "
             "project_id=%s version_1=%s version_2=%s",
             project_id,
             version_1,
             version_2,
         )
-
         raise HTTPException(
             status_code=404,
             detail=str(error),
@@ -107,13 +99,12 @@ def compare_versions(
 
     except Exception as error:
         logger.exception(
-            "Version comparison crashed "
+            "Version comparison crashed: "
             "project_id=%s version_1=%s version_2=%s",
             project_id,
             version_1,
             version_2,
         )
-
         raise HTTPException(
             status_code=500,
             detail=(
@@ -123,24 +114,11 @@ def compare_versions(
         ) from error
 
 
-@router.get(
-    "/multi-report",
-)
+@router.get("/multi-report")
 def multi_version_report(
     project_id: int,
-    versions: str = Query(
-        ...,
-        description=(
-            "Comma-separated version IDs, "
-            "for example: 1,2,3,4"
-        ),
-    ),
-    mode: str = Query(
-        "evolution",
-        description=(
-            "Comparison mode: evolution or baseline."
-        ),
-    ),
+    versions: str = Query(...),
+    mode: str = Query("evolution"),
     db: Session = Depends(get_db),
 ):
     try:
@@ -154,8 +132,7 @@ def multi_version_report(
             status_code=400,
             detail=(
                 "Invalid versions value. "
-                "Use comma-separated integer IDs, "
-                "for example: 1,2,3,4."
+                "Use comma-separated integer IDs."
             ),
         ) from error
 
@@ -168,29 +145,23 @@ def multi_version_report(
     if mode not in {"evolution", "baseline"}:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid mode. "
-                "Use 'evolution' or 'baseline'."
-            ),
+            detail="Invalid mode. Use 'evolution' or 'baseline'.",
         )
 
     try:
-        return (
-            VersionComparisonService.compare_multiple_versions(
-                db=db,
-                project_id=project_id,
-                version_ids=version_ids,
-                mode=mode,
-            )
+        return VersionComparisonService.compare_multiple_versions(
+            db=db,
+            project_id=project_id,
+            version_ids=version_ids,
+            mode=mode,
         )
 
     except ValueError as error:
         logger.exception(
-            "Multi-version comparison validation error "
+            "Multi-version comparison validation error: "
             "project_id=%s",
             project_id,
         )
-
         raise HTTPException(
             status_code=404,
             detail=str(error),
@@ -198,11 +169,9 @@ def multi_version_report(
 
     except Exception as error:
         logger.exception(
-            "Multi-version comparison crashed "
-            "project_id=%s",
+            "Multi-version comparison crashed: project_id=%s",
             project_id,
         )
-
         raise HTTPException(
             status_code=500,
             detail=(
