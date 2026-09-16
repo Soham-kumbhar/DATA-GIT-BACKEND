@@ -18,15 +18,19 @@ class ProjectService:
             project_data.path
         ).expanduser()
 
-        if not project_path.exists():
+        if project_path.exists() and not project_path.is_dir():
             raise ValueError(
-                "Project path does not exist."
+                "Project path exists but is not a directory."
             )
 
-        if not project_path.is_dir():
-            raise ValueError(
-                "Project path is not a directory."
-            )
+        # NOTE: this creates the folder on the *backend server's*
+        # filesystem, not on the machine the browser is running on.
+        # On an ephemeral host (Render free tier, etc.) this folder
+        # will not persist across restarts/redeploys, and it will
+        # not contain any real Git/DVC repo. This unblocks the
+        # "Create Project" flow for a remotely-deployed demo; it
+        # does not give DATAGIT real access to a user's local repo.
+        project_path.mkdir(parents=True, exist_ok=True)
 
         resolved_path = str(
             project_path.resolve()
