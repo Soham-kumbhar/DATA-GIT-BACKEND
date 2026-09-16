@@ -9,11 +9,6 @@ class ProjectCreate(BaseModel):
         max_length=200,
     )
 
-    path: str = Field(
-        min_length=1,
-        max_length=1000,
-    )
-
     description: str | None = None
 
 
