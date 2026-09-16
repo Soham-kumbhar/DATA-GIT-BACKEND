@@ -26,3 +26,4 @@ typing_extensions==4.16.0
 uvicorn==0.52.0
 pandas
 dvc
+scipy
