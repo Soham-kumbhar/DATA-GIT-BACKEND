@@ -27,3 +27,4 @@ uvicorn==0.52.0
 pandas
 dvc
 scipy
+scikit-learn
