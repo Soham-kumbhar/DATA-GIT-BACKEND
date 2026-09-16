@@ -28,3 +28,4 @@ pandas
 dvc
 scipy
 scikit-learn
+groq
