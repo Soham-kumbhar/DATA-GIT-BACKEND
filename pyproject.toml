@@ -13,5 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-DataGit = "app.cli.main:cli"
+datagit = "app.cli.main:cli"
 enchanting = "app.cli.main:cli"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
