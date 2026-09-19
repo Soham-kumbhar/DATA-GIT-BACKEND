@@ -30,3 +30,5 @@ scipy
 scikit-learn
 groq
 python-multipart
+PyJWT
+pwdlib[argon2]
