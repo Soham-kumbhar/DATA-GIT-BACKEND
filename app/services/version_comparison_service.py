@@ -2,7 +2,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models import MLRun, Project, Version
+from app.db.models import MLRun, Project, Version, VersionPreparationEvidence
 from app.services.dataset_analysis_service import (
     DatasetAnalysisService,
 )
@@ -704,6 +704,18 @@ class VersionComparisonService:
         )
 
         # --------------------------------------------------------
+        # PREPARATION EVIDENCE
+        # --------------------------------------------------------
+
+        preparation = (
+            VersionComparisonService._compare_preparation(
+                db=db,
+                before=before,
+                after=after,
+            )
+        )
+
+        # --------------------------------------------------------
         # EVIDENCE CHAIN
         # --------------------------------------------------------
 
@@ -861,11 +873,148 @@ class VersionComparisonService:
             "dataset_analysis":
                 dataset_analysis,
 
+            "preparation":
+                preparation,
+
             "evidence_chain":
                 evidence_chain,
 
             "changes":
                 changes,
+        }
+
+    # ============================================================
+    # PREPARATION COMPARISON
+    # ============================================================
+
+    @staticmethod
+    def _compare_preparation(
+        db: Session,
+        before: Version,
+        after: Version,
+    ) -> dict[str, Any]:
+        evidence_before = (
+            db.query(VersionPreparationEvidence)
+            .filter(
+                VersionPreparationEvidence.version_id == before.id
+            )
+            .first()
+        )
+
+        evidence_after = (
+            db.query(VersionPreparationEvidence)
+            .filter(
+                VersionPreparationEvidence.version_id == after.id
+            )
+            .first()
+        )
+
+        if evidence_before is None and evidence_after is None:
+            return {
+                "available": False,
+                "status": "unavailable",
+                "changed": False,
+                "baseline": [],
+                "target": [],
+                "added": [],
+                "removed": [],
+                "modified": [],
+                "message": (
+                    "Preparation history is not recorded for "
+                    "the selected versions."
+                ),
+            }
+
+        baseline = (
+            evidence_before.operations
+            if evidence_before is not None
+            and isinstance(evidence_before.operations, list)
+            else []
+        )
+
+        target = (
+            evidence_after.operations
+            if evidence_after is not None
+            and isinstance(evidence_after.operations, list)
+            else []
+        )
+
+        baseline = [
+            item for item in baseline
+            if isinstance(item, dict)
+        ]
+
+        target = [
+            item for item in target
+            if isinstance(item, dict)
+        ]
+
+        baseline_by_name = {
+            str(item.get("operation", "unknown")): item
+            for item in baseline
+        }
+
+        target_by_name = {
+            str(item.get("operation", "unknown")): item
+            for item in target
+        }
+
+        baseline_names = set(baseline_by_name)
+        target_names = set(target_by_name)
+
+        added = [
+            target_by_name[name]
+            for name in sorted(target_names - baseline_names)
+        ]
+
+        removed = [
+            baseline_by_name[name]
+            for name in sorted(baseline_names - target_names)
+        ]
+
+        modified = []
+
+        for name in sorted(
+            baseline_names & target_names
+        ):
+            old_value = baseline_by_name[name]
+            new_value = target_by_name[name]
+
+            if old_value != new_value:
+                modified.append(
+                    {
+                        "operation": name,
+                        "baseline": old_value,
+                        "target": new_value,
+                    }
+                )
+
+        return {
+            "available": True,
+            "status": (
+                "recorded"
+                if evidence_before is not None
+                and evidence_after is not None
+                else "partial"
+            ),
+            "changed": bool(
+                added or removed or modified
+            ),
+            "baseline": baseline,
+            "target": target,
+            "added": added,
+            "removed": removed,
+            "modified": modified,
+            "message": (
+                "Preparation operations are recorded for "
+                "both selected versions."
+                if evidence_before is not None
+                and evidence_after is not None
+                else (
+                    "Preparation evidence is recorded for "
+                    "only one selected version."
+                )
+            ),
         }
 
     # ============================================================

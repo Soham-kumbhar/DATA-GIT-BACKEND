@@ -2,19 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.version import (
-    VersionCreate,
-    VersionResponse,
-)
-from app.schemas.version_report import (
-    VersionReportResponse,
-)
-from app.services.version_service import (
-    VersionService,
-)
-from app.services.version_report_service import (
-    VersionReportService,
-)
+from app.schemas.version import VersionCreate, VersionResponse
+from app.services.version_service import VersionService
 
 
 router = APIRouter(
@@ -34,23 +23,10 @@ def finalize_version(
     db: Session = Depends(get_db),
 ):
     try:
-        result_evidence = None
-
-        if data.result_evidence is not None:
-            result_evidence = (
-                data.result_evidence.model_dump(
-                    exclude_none=True
-                )
-            )
-
         return VersionService.finalize_version(
             db=db,
             project_id=project_id,
             description=data.description,
-            preparation_operations=(
-                data.preparation_operations
-            ),
-            result_evidence=result_evidence,
         )
 
     except ValueError as error:
@@ -80,29 +56,6 @@ def get_versions(
         db=db,
         project_id=project_id,
     )
-
-
-@router.get(
-    "/{version_id}/report",
-    response_model=VersionReportResponse,
-)
-def get_version_report(
-    project_id: int,
-    version_id: int,
-    db: Session = Depends(get_db),
-):
-    try:
-        return VersionReportService.build_report(
-            db=db,
-            project_id=project_id,
-            version_id=version_id,
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(error),
-        )
 
 
 @router.get(

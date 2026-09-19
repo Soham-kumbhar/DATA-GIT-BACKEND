@@ -2,15 +2,13 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
+from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
 from app.api.datasets import router as datasets_router
 from app.api.models import router as models_router
 from app.api.status import router as status_router
-
-from app.api.dataset_preparation import (
-    router as dataset_preparation_router,
-)
 
 from app.api.version_comparison import (
     router as version_comparison_router,
@@ -43,6 +41,74 @@ from app.api.comparison import (
 from app.core.config import settings
 from app.db.database import Base, engine
 from app.db import models
+from app.db import user_models
+
+
+# ============================================================
+# OPTIONAL DATASET PREPARATION ROUTER
+# ============================================================
+#
+# Dataset preparation currently imports scikit-learn.
+# On this Windows machine, Application Control is blocking
+# one of scikit-learn's native DLLs.
+#
+# We keep the rest of DATAGIT available so the API can start.
+# The dataset-preparation router is included only when its
+# dependencies can be imported successfully.
+# ============================================================
+
+dataset_preparation_router = None
+
+try:
+    from app.api.dataset_preparation import (
+        router as dataset_preparation_router,
+    )
+except Exception as exc:
+    print(
+        "[WARNING] Dataset preparation router could not be loaded."
+    )
+    print(
+        f"[WARNING] Reason: {exc}"
+    )
+    print(
+        "[WARNING] The rest of DATAGIT will continue to start."
+    )
+
+
+# ============================================================
+# SMALL SQLite MIGRATION
+# ============================================================
+
+def ensure_project_user_id_column():
+    inspector = inspect(engine)
+
+    tables = inspector.get_table_names()
+
+    if "projects" not in tables:
+        return
+
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("projects")
+    }
+
+    if "user_id" not in columns:
+        if engine.dialect.name != "sqlite":
+            raise RuntimeError(
+                "The existing database needs a migration "
+                "for projects.user_id."
+            )
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE projects "
+                    "ADD COLUMN user_id INTEGER"
+                )
+            )
+
+
+ensure_project_user_id_column()
 
 
 # ============================================================
@@ -65,16 +131,19 @@ app = FastAPI(
 # ============================================================
 # CORS
 # ============================================================
-# Allowed origins now come from the ALLOWED_ORIGINS env var
-# (comma-separated), falling back to localhost for local dev.
-# Set ALLOWED_ORIGINS on your backend host to include your
-# deployed frontend URL, e.g.:
-#   ALLOWED_ORIGINS=https://frontend-zeta-one-69.vercel.app,http://localhost:5173
 
-_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+default_origins = (
+    "http://localhost:5173,"
+    "http://127.0.0.1:5173,"
+    "https://datagit-frontend.vercel.app"
+)
+
 allowed_origins = [
     origin.strip()
-    for origin in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        default_origins,
+    ).split(",")
     if origin.strip()
 ]
 
@@ -96,7 +165,19 @@ def health_check():
     return {
         "status": "ok",
         "application": settings.app_name,
+        "dataset_preparation_available": (
+            dataset_preparation_router is not None
+        ),
     }
+
+
+# ============================================================
+# AUTHENTICATION
+# ============================================================
+
+app.include_router(
+    auth_router
+)
 
 
 # ============================================================
@@ -119,26 +200,10 @@ app.include_router(
     status_router
 )
 
-app.include_router(
-    dataset_preparation_router
-)
-
-
-# ============================================================
-# VERSION ROUTES
-#
-# The dedicated version comparison router already provides:
-#
-# GET
-# /projects/{project_id}/versions/compare
-#
-# with:
-#   version_1
-#   version_2
-#
-# Keep this route in the version-scoped API rather than creating
-# a second project-level comparison endpoint.
-# ============================================================
+if dataset_preparation_router is not None:
+    app.include_router(
+        dataset_preparation_router
+    )
 
 app.include_router(
     version_comparison_router
@@ -155,11 +220,6 @@ app.include_router(
 app.include_router(
     versions_router
 )
-
-
-# ============================================================
-# OTHER ROUTES
-# ============================================================
 
 app.include_router(
     evidence_router

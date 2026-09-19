@@ -9,6 +9,11 @@ class ProjectCreate(BaseModel):
         max_length=200,
     )
 
+    path: str | None = Field(
+        default=None,
+        max_length=1000,
+    )
+
     description: str | None = None
 
 
@@ -20,4 +25,6 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )

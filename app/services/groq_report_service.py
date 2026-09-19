@@ -479,6 +479,7 @@ Use exactly this structure:
             response = client.chat.completions.create(
                 model=GroqReportService.DEFAULT_MODEL,
                 temperature=0.2,
+                max_completion_tokens=1000,
                 response_format={
                     "type": "json_object"
                 },
@@ -697,6 +698,7 @@ Use exactly this structure:
             response = client.chat.completions.create(
                 model=GroqReportService.DEFAULT_MODEL,
                 temperature=0.2,
+                max_completion_tokens=1000,
                 response_format={
                     "type": "json_object"
                 },

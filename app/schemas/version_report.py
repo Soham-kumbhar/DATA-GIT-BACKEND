@@ -1,48 +1,37 @@
+from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
-
-
-class ReportSection(BaseModel):
-    title: str
-    summary: str
-    details: dict[str, Any] = Field(
-        default_factory=dict
-    )
+from pydantic import BaseModel
 
 
 class VersionReportResponse(BaseModel):
+    id: int
     project_id: int
+    version_number: int
+    git_commit: str
+    dvc_state: dict[str, Any] | None
+    description: str | None
+    ml_run_id: int | None
+    created_at: datetime | None
 
-    version_1: int
-    version_2: int
+    project: dict[str, Any]
+    dataset: dict[str, Any]
+    data_quality: dict[str, Any]
+    preparation: dict[str, Any]
 
-    executive_summary: ReportSection
+    # New version-centric result evidence.
+    result_evidence: dict[str, Any]
 
-    version_overview: ReportSection
+    # Compatibility fields for the current frontend.
+    model: dict[str, Any] | None
+    training: dict[str, Any]
+    performance: dict[str, Any]
+    evaluation: dict[str, Any]
 
-    what_changed: ReportSection
+    git: dict[str, Any]
+    dvc: dict[str, Any] | None
+    lineage: dict[str, Any]
+    evidence_completeness: dict[str, Any]
 
-    dataset_analysis: ReportSection
-
-    feature_analysis: ReportSection
-
-    code_analysis: ReportSection
-
-    model_parameters: ReportSection
-
-    performance_comparison: ReportSection
-
-    error_analysis: ReportSection
-
-    change_chain: ReportSection
-
-    git_dvc_evidence: ReportSection
-
-    ai_root_cause_analysis: ReportSection
-
-    ai_recommendations: ReportSection
-
-    reproducibility: ReportSection
-
-    technical_evidence: ReportSection
+    report_metadata: dict[str, Any]
+    ai_report: dict[str, Any] | None = None

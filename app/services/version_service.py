@@ -1,6 +1,11 @@
 from sqlalchemy.orm import Session
 
-from app.db.models import Project, Version
+from app.db.models import (
+    Project,
+    Version,
+    VersionPreparationEvidence,
+    VersionResultEvidence,
+)
 from app.services.dvc_service import DVCService
 from app.services.git_service import GitService
 
@@ -12,6 +17,8 @@ class VersionService:
         db: Session,
         project_id: int,
         description: str,
+        preparation_operations: list[dict] | None = None,
+        result_evidence: dict | None = None,
     ) -> Version:
         project = (
             db.query(Project)
@@ -22,20 +29,31 @@ class VersionService:
         if not project:
             raise ValueError("Project not found.")
 
-        git_commit = GitService.get_current_commit(project.path)
-        dvc_state = DVCService.get_state(project.path)
+        git_commit = GitService.get_current_commit(
+            project.path
+        )
+
+        dvc_state = DVCService.get_state(
+            project.path
+        )
 
         existing_versions = (
             db.query(Version)
-            .filter(Version.project_id == project_id)
-            .order_by(Version.version_number.asc())
+            .filter(
+                Version.project_id == project_id
+            )
+            .order_by(
+                Version.version_number.asc()
+            )
             .all()
         )
 
         for existing_version in existing_versions:
             if (
-                existing_version.git_commit == git_commit
-                and existing_version.dvc_state == dvc_state
+                existing_version.git_commit
+                == git_commit
+                and existing_version.dvc_state
+                == dvc_state
             ):
                 raise ValueError(
                     "This Git + DVC state is already finalized as "
@@ -58,17 +76,70 @@ class VersionService:
         )
 
         db.add(version)
+        db.flush()
+
+        preparation_evidence = (
+            VersionPreparationEvidence(
+                version_id=version.id,
+                operations=(
+                    preparation_operations
+                    if preparation_operations is not None
+                    else []
+                ),
+            )
+        )
+
+        db.add(preparation_evidence)
+
+        if result_evidence:
+            db.add(
+                VersionResultEvidence(
+                    version_id=version.id,
+                    model_name=result_evidence.get(
+                        "model_name"
+                    ),
+                    model_path=result_evidence.get(
+                        "model_path"
+                    ),
+                    model_sha256=result_evidence.get(
+                        "model_sha256"
+                    ),
+                    framework=result_evidence.get(
+                        "framework"
+                    ),
+                    framework_version=result_evidence.get(
+                        "framework_version"
+                    ),
+                    metrics=result_evidence.get(
+                        "metrics"
+                    ),
+                    evaluation=result_evidence.get(
+                        "evaluation"
+                    ),
+                    notes=result_evidence.get(
+                        "notes"
+                    ),
+                )
+            )
+
         db.commit()
         db.refresh(version)
 
         return version
 
     @staticmethod
-    def get_versions(db: Session, project_id: int):
+    def get_versions(
+        db: Session,
+        project_id: int,
+    ):
         return (
             db.query(Version)
-            .filter(Version.project_id == project_id)
-            .order_by(Version.version_number.asc())
+            .filter(
+                Version.project_id == project_id
+            )
+            .order_by(
+                Version.version_number.asc()
+            )
             .all()
         )
 

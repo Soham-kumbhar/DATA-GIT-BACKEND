@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user
 from app.db.database import get_db
+from app.db.user_models import User
 from app.schemas.project import ProjectCreate, ProjectResponse
 from app.services.project_service import ProjectService
 
@@ -19,12 +21,15 @@ router = APIRouter(
 )
 def create_project(
     project_data: ProjectCreate,
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db),
 ):
     try:
         return ProjectService.create_project(
             db=db,
-            user_id=None,
+            user_id=current_user.id,
             project_data=project_data,
         )
 
@@ -40,11 +45,14 @@ def create_project(
     response_model=list[ProjectResponse],
 )
 def get_projects(
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db),
 ):
     return ProjectService.get_projects(
         db=db,
-        user_id=None,
+        user_id=current_user.id,
     )
 
 
@@ -54,11 +62,14 @@ def get_projects(
 )
 def get_project(
     project_id: int,
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db),
 ):
     project = ProjectService.get_project(
         db=db,
-        user_id=None,
+        user_id=current_user.id,
         project_id=project_id,
     )
 
