@@ -2,7 +2,15 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.db.models import Project
+from app.db.models import (
+    Dataset,
+    MLRun,
+    Model,
+    Project,
+    Version,
+    VersionPreparationEvidence,
+    VersionResultEvidence,
+)
 from app.schemas.project import ProjectCreate
 
 
@@ -22,8 +30,6 @@ class ProjectService:
                 "Project name cannot be empty."
             )
 
-        # The path is metadata supplied by the client.
-        # The backend does NOT access the user's filesystem.
         if project_data.path:
             project_path = project_data.path.strip()
         else:
@@ -94,3 +100,113 @@ class ProjectService:
             )
             .first()
         )
+
+    @staticmethod
+    def delete_project(
+        db: Session,
+        user_id: int | None,
+        project_id: int,
+    ) -> bool:
+
+        project = (
+            db.query(Project)
+            .filter(
+                Project.id == project_id,
+                Project.user_id == user_id,
+            )
+            .first()
+        )
+
+        if project is None:
+            return False
+
+        try:
+            # ------------------------------------------------
+            # Delete version evidence first.
+            # ------------------------------------------------
+
+            version_ids = [
+                row[0]
+                for row in (
+                    db.query(Version.id)
+                    .filter(
+                        Version.project_id
+                        == project_id
+                    )
+                    .all()
+                )
+            ]
+
+            if version_ids:
+                db.query(
+                    VersionResultEvidence
+                ).filter(
+                    VersionResultEvidence.version_id.in_(
+                        version_ids
+                    )
+                ).delete(
+                    synchronize_session=False
+                )
+
+                db.query(
+                    VersionPreparationEvidence
+                ).filter(
+                    VersionPreparationEvidence.version_id.in_(
+                        version_ids
+                    )
+                ).delete(
+                    synchronize_session=False
+                )
+
+            # ------------------------------------------------
+            # Delete finalized versions.
+            # ------------------------------------------------
+
+            db.query(Version).filter(
+                Version.project_id
+                == project_id
+            ).delete(
+                synchronize_session=False
+            )
+
+            # ------------------------------------------------
+            # Delete project-owned datasets/models.
+            # ------------------------------------------------
+
+            db.query(Dataset).filter(
+                Dataset.project_id
+                == project_id
+            ).delete(
+                synchronize_session=False
+            )
+
+            db.query(Model).filter(
+                Model.project_id
+                == project_id
+            ).delete(
+                synchronize_session=False
+            )
+
+            # ------------------------------------------------
+            # Delete legacy ML runs for this project.
+            # ------------------------------------------------
+
+            db.query(MLRun).filter(
+                MLRun.project_id
+                == project_id
+            ).delete(
+                synchronize_session=False
+            )
+
+            # ------------------------------------------------
+            # Finally delete the project itself.
+            # ------------------------------------------------
+
+            db.delete(project)
+            db.commit()
+
+            return True
+
+        except Exception:
+            db.rollback()
+            raise
