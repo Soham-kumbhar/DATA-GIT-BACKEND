@@ -9,6 +9,7 @@ from app.api.projects import router as projects_router
 from app.api.datasets import router as datasets_router
 from app.api.models import router as models_router
 from app.api.status import router as status_router
+from app.api.system import router as system_router
 
 from app.api.version_comparison import (
     router as version_comparison_router,
@@ -180,6 +181,10 @@ fastapi_app.include_router(
 
 fastapi_app.include_router(
     comparison_router
+)
+
+fastapi_app.include_router(
+    system_router
 )
 
 
