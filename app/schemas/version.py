@@ -19,12 +19,35 @@ class VersionCreate(BaseModel):
 
 
 class VersionResponse(BaseModel):
+    # ========================================================
+    # INTERNAL DATABASE IDENTIFIERS
+    # ========================================================
+
     id: int
     project_id: int
+
+    # ========================================================
+    # USER-FACING PROJECT IDENTIFIER
+    # ========================================================
+
+    project_number: int
+
+    # ========================================================
+    # USER-FACING VERSION IDENTIFIER
+    #
+    # Scoped to the project.
+    # ========================================================
+
     version_number: int
 
+    # ========================================================
+    # VERSION EVIDENCE
+    # ========================================================
+
     git_commit: str
+
     dvc_state: dict | None
+
     description: str | None
 
     # Kept for compatibility with existing data/API consumers.

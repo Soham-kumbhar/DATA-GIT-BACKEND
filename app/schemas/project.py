@@ -1,6 +1,10 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+)
 
 
 class ProjectCreate(BaseModel):
@@ -17,8 +21,20 @@ class ProjectCreate(BaseModel):
     description: str | None = None
 
 
+class ClaimLegacyProjectRequest(BaseModel):
+    path: str = Field(
+        min_length=1,
+        max_length=1000,
+    )
+
+
 class ProjectResponse(BaseModel):
+    # Internal database primary key.
     id: int
+
+    # User-facing project number.
+    project_number: int
+
     name: str
     path: str
     description: str | None
@@ -26,5 +42,5 @@ class ProjectResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(
-        from_attributes=True
+        from_attributes=True,
     )

@@ -1,11 +1,28 @@
 import os
-from datetime import datetime, timedelta, timezone
+
+from datetime import (
+    datetime,
+    timedelta,
+    timezone,
+)
 
 import jwt
+
 from dotenv import load_dotenv
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from fastapi import (
+    Depends,
+    HTTPException,
+    status,
+)
+
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
+
 from pwdlib import PasswordHash
+
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -14,10 +31,21 @@ from app.db.user_models import User
 
 load_dotenv()
 
+
 password_hash = PasswordHash.recommended()
 
+
 ALGORITHM = "HS256"
+
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+# CLI credentials are intentionally longer lived than
+# normal browser access tokens.
+#
+# The CLI credential is stored in the operating-system
+# credential manager and is never written into the project.
+CLI_TOKEN_EXPIRE_DAYS = 30
+
 
 bearer_scheme = HTTPBearer(
     auto_error=False,
@@ -25,18 +53,25 @@ bearer_scheme = HTTPBearer(
 
 
 def get_jwt_secret() -> str:
-    secret = os.getenv("JWT_SECRET_KEY")
+    secret = os.getenv(
+        "JWT_SECRET_KEY"
+    )
 
     if not secret:
         raise RuntimeError(
-            "JWT_SECRET_KEY environment variable is not configured."
+            "JWT_SECRET_KEY environment variable "
+            "is not configured."
         )
 
     return secret
 
 
-def hash_password(password: str) -> str:
-    return password_hash.hash(password)
+def hash_password(
+    password: str,
+) -> str:
+    return password_hash.hash(
+        password
+    )
 
 
 def verify_password(
@@ -49,14 +84,13 @@ def verify_password(
     )
 
 
-def create_access_token(
+def _create_token(
     user_id: int,
+    expires_delta: timedelta,
 ) -> str:
     expire = (
         datetime.now(timezone.utc)
-        + timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        + expires_delta
     )
 
     payload = {
@@ -71,6 +105,28 @@ def create_access_token(
     )
 
 
+def create_access_token(
+    user_id: int,
+) -> str:
+    return _create_token(
+        user_id=user_id,
+        expires_delta=timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+    )
+
+
+def create_cli_access_token(
+    user_id: int,
+) -> str:
+    return _create_token(
+        user_id=user_id,
+        expires_delta=timedelta(
+            days=CLI_TOKEN_EXPIRE_DAYS
+        ),
+    )
+
+
 def decode_access_token(
     token: str,
 ) -> int:
@@ -81,7 +137,9 @@ def decode_access_token(
             algorithms=[ALGORITHM],
         )
 
-        subject = payload.get("sub")
+        subject = payload.get(
+            "sub"
+        )
 
         if subject is None:
             raise ValueError(
@@ -120,6 +178,7 @@ def get_current_user(
         user_id = decode_access_token(
             credentials.credentials
         )
+
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -131,7 +190,9 @@ def get_current_user(
 
     user = (
         db.query(User)
-        .filter(User.id == user_id)
+        .filter(
+            User.id == user_id
+        )
         .first()
     )
 

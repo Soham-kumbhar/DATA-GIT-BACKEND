@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
+
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -18,6 +24,10 @@ from app.schemas.auth import (
     UserResponse,
 )
 
+from app.services.cli_credential_service import (
+    ensure_cli_token,
+)
+
 
 router = APIRouter(
     prefix="/auth",
@@ -25,8 +35,31 @@ router = APIRouter(
 )
 
 
-def normalize_email(email: str) -> str:
+def normalize_email(
+    email: str,
+) -> str:
     return email.strip().lower()
+
+
+def _provision_cli_access(
+    user: User,
+) -> None:
+    """
+    Provision CLI authentication for the signed-in user.
+
+    The credential is stored by the CLI credential service.
+    Failure to provision CLI access must not break browser
+    authentication.
+    """
+
+    try:
+        ensure_cli_token(
+            user.id
+        )
+    except Exception:
+        # Browser login must remain functional even if
+        # OS credential storage is temporarily unavailable.
+        pass
 
 
 @router.post(
@@ -39,7 +72,10 @@ def register(
     db: Session = Depends(get_db),
 ):
     name = data.name.strip()
-    email = normalize_email(data.email)
+
+    email = normalize_email(
+        data.email
+    )
 
     if not name:
         raise HTTPException(
@@ -55,7 +91,9 @@ def register(
 
     existing_user = (
         db.query(User)
-        .filter(User.email == email)
+        .filter(
+            User.email == email
+        )
         .first()
     )
 
@@ -63,7 +101,8 @@ def register(
         raise HTTPException(
             status_code=409,
             detail=(
-                "An account with this email already exists."
+                "An account with this email "
+                "already exists."
             ),
         )
 
@@ -80,12 +119,18 @@ def register(
     try:
         db.commit()
         db.refresh(user)
+
     except Exception:
         db.rollback()
         raise
 
     access_token = create_access_token(
         user.id
+    )
+
+    # Provision CLI authentication silently.
+    _provision_cli_access(
+        user
     )
 
     return AuthResponse(
@@ -95,6 +140,8 @@ def register(
             id=user.id,
             name=user.name,
             email=user.email,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
         ),
     )
 
@@ -107,11 +154,15 @@ def login(
     data: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    email = normalize_email(data.email)
+    email = normalize_email(
+        data.email
+    )
 
     user = (
         db.query(User)
-        .filter(User.email == email)
+        .filter(
+            User.email == email
+        )
         .first()
     )
 
@@ -134,6 +185,11 @@ def login(
         user.id
     )
 
+    # Provision CLI authentication silently.
+    _provision_cli_access(
+        user
+    )
+
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
@@ -141,6 +197,8 @@ def login(
             id=user.id,
             name=user.name,
             email=user.email,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
         ),
     )
 
@@ -154,8 +212,16 @@ def get_me(
         get_current_user
     ),
 ):
+    # Make sure an existing signed-in user also gets
+    # CLI access without manually copying a token.
+    _provision_cli_access(
+        current_user
+    )
+
     return UserResponse(
         id=current_user.id,
         name=current_user.name,
         email=current_user.email,
+        created_at=current_user.created_at,
+        updated_at=current_user.updated_at,
     )

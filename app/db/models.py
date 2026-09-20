@@ -1,7 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, ForeignKey, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import (
+    DateTime,
+    JSON,
+    String,
+    Text,
+    ForeignKey,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
 from app.db.database import Base
 
@@ -9,16 +20,55 @@ from app.db.database import Base
 class Project(Base):
     __tablename__ = "projects"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "project_number",
+            name="uq_projects_user_project_number",
+        ),
+    )
+
+    # ========================================================
+    # INTERNAL DATABASE ID
+    # ========================================================
+
     id: Mapped[int] = mapped_column(
         primary_key=True,
         index=True,
     )
 
-    # Owner of the project.
-    # Nullable for now so existing projects created
-    # before authentication can still exist.
+    # ========================================================
+    # PROJECT OWNER
+    #
+    # Nullable only for legacy projects created before
+    # authentication/project ownership existed.
+    # ========================================================
+
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+
+    # ========================================================
+    # USER-FACING PROJECT NUMBER
+    #
+    # Starts from 1 independently for each user.
+    #
+    # Example:
+    #
+    # User A
+    #   Project 1
+    #   Project 2
+    #
+    # User B
+    #   Project 1
+    #   Project 2
+    #
+    # This is NOT the database primary key.
+    # ========================================================
+
+    project_number: Mapped[int | None] = mapped_column(
         nullable=True,
         index=True,
     )
@@ -118,10 +168,26 @@ class Model(Base):
 class Version(Base):
     __tablename__ = "versions"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "version_number",
+            name="uq_versions_project_version_number",
+        ),
+    )
+
+    # ========================================================
+    # INTERNAL DATABASE ID
+    # ========================================================
+
     id: Mapped[int] = mapped_column(
         primary_key=True,
         index=True,
     )
+
+    # ========================================================
+    # INTERNAL PROJECT FOREIGN KEY
+    # ========================================================
 
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id"),
@@ -129,32 +195,67 @@ class Version(Base):
         index=True,
     )
 
-    # Legacy ML run association.
-    # Kept for backward compatibility with existing data.
-    # New result evidence does not depend on MLRun.
+    # ========================================================
+    # PROJECT RELATIONSHIP
+    #
+    # This allows VersionResponse to expose project_number
+    # without changing project_id.
+    # ========================================================
+
+    project: Mapped["Project"] = relationship(
+        "Project",
+        lazy="joined",
+    )
+
+    @property
+    def project_number(self) -> int | None:
+        if self.project is None:
+            return None
+
+        return self.project.project_number
+
+    # ========================================================
+    # LEGACY ML RUN ASSOCIATION
+    # ========================================================
+
     ml_run_id: Mapped[int | None] = mapped_column(
         ForeignKey("ml_runs.id"),
         nullable=True,
         index=True,
     )
 
+    # ========================================================
+    # USER-FACING VERSION NUMBER
+    #
+    # Starts from 1 independently for each project.
+    # ========================================================
+
     version_number: Mapped[int] = mapped_column(
         nullable=False,
     )
 
-    # Exact Git commit for this DataGit version
+    # ========================================================
+    # GIT STATE
+    # ========================================================
+
     git_commit: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
     )
 
-    # Exact DVC state for this DataGit version
+    # ========================================================
+    # DVC STATE
+    # ========================================================
+
     dvc_state: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
     )
 
-    # Human-readable message describing why this version was finalized.
+    # ========================================================
+    # VERSION DESCRIPTION
+    # ========================================================
+
     description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -166,6 +267,10 @@ class Version(Base):
         nullable=False,
     )
 
+    # ========================================================
+    # PREPARATION EVIDENCE
+    # ========================================================
+
     preparation_evidence = relationship(
         "VersionPreparationEvidence",
         back_populates="version",
@@ -173,8 +278,10 @@ class Version(Base):
         cascade="all, delete-orphan",
     )
 
-    # Optional model / metrics / evaluation evidence
-    # attached directly to this finalized version.
+    # ========================================================
+    # RESULT EVIDENCE
+    # ========================================================
+
     result_evidence = relationship(
         "VersionResultEvidence",
         back_populates="version",
@@ -198,7 +305,6 @@ class VersionPreparationEvidence(Base):
         index=True,
     )
 
-    # Preparation operations captured for this finalized version.
     operations: Mapped[list] = mapped_column(
         JSON,
         nullable=False,
@@ -226,25 +332,29 @@ class VersionResultEvidence(Base):
         index=True,
     )
 
-    # Optional model identity/evidence.
+    # ========================================================
+    # MODEL EVIDENCE
+    # ========================================================
+
     model_name: Mapped[str | None] = mapped_column(
         String(200),
         nullable=True,
     )
 
-    # Local path, relative path, URL, object reference, etc.
     model_path: Mapped[str | None] = mapped_column(
         String(2000),
         nullable=True,
     )
 
-    # SHA-256 of the model artifact when the user provides it.
     model_sha256: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
     )
 
-    # Framework information is evidence, not training-run tracking.
+    # ========================================================
+    # FRAMEWORK EVIDENCE
+    # ========================================================
+
     framework: Mapped[str | None] = mapped_column(
         String(200),
         nullable=True,
@@ -255,15 +365,19 @@ class VersionResultEvidence(Base):
         nullable=True,
     )
 
-    # Arbitrary ML metrics:
-    # {"accuracy": 0.91, "precision": 0.89, "recall": 0.94, "f1": 0.91}
+    # ========================================================
+    # METRICS
+    # ========================================================
+
     metrics: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
     )
 
-    # Arbitrary evaluation evidence:
-    # confusion matrix, test-set information, notes, etc.
+    # ========================================================
+    # EVALUATION EVIDENCE
+    # ========================================================
+
     evaluation: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
@@ -300,19 +414,16 @@ class MLRun(Base):
         index=True,
     )
 
-    # Exact Git state when this ML run happened
     git_commit: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
     )
 
-    # DVC state when this ML run happened
     dvc_state: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
     )
 
-    # ML information
     model_name: Mapped[str] = mapped_column(
         String(200),
         nullable=False,

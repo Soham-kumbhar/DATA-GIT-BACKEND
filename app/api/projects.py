@@ -1,12 +1,25 @@
-import ctypes
+﻿import ctypes
 from ctypes import wintypes
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+)
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user
 from app.db.database import get_db
-from app.schemas.project import ProjectCreate, ProjectResponse
-from app.services.project_service import ProjectService
+from app.db.user_models import User
+from app.schemas.project import (
+    ClaimLegacyProjectRequest,
+    ProjectCreate,
+    ProjectResponse,
+)
+from app.services.project_service import (
+    ProjectConflictError,
+    ProjectService,
+)
 
 
 router = APIRouter(
@@ -22,7 +35,11 @@ router = APIRouter(
 if hasattr(ctypes, "windll"):
     ole32 = ctypes.windll.ole32
     user32 = ctypes.windll.user32
-    shcore = getattr(ctypes.windll, "shcore", None)
+    shcore = getattr(
+        ctypes.windll,
+        "shcore",
+        None,
+    )
 else:
     ole32 = None
     user32 = None
@@ -53,11 +70,28 @@ def _guid_from_string(
 ):
     class GUID(ctypes.Structure):
         _fields_ = [
-            ("Data1", wintypes.DWORD),
-            ("Data2", wintypes.WORD),
-            ("Data3", wintypes.WORD),
-            ("Data4", wintypes.BYTE * 8),
+            (
+                "Data1",
+                wintypes.DWORD,
+            ),
+            (
+                "Data2",
+                wintypes.WORD,
+            ),
+            (
+                "Data3",
+                wintypes.WORD,
+            ),
+            (
+                "Data4",
+                wintypes.BYTE * 8,
+            ),
         ]
+
+    if ole32 is None:
+        raise RuntimeError(
+            "Windows COM is unavailable."
+        )
 
     guid = GUID()
 
@@ -78,7 +112,9 @@ def _get_com_method(
     vtable = ctypes.cast(
         instance,
         ctypes.POINTER(
-            ctypes.POINTER(ctypes.c_void_p)
+            ctypes.POINTER(
+                ctypes.c_void_p
+            )
         ),
     ).contents
 
@@ -102,7 +138,9 @@ def _release_com_object(
                 wintypes.ULONG,
                 [],
             )
+
             release(instance)
+
         except Exception:
             pass
 
@@ -111,9 +149,8 @@ def _set_windows_dpi_awareness():
     """
     Ask Windows for Per-Monitor-V2 DPI awareness.
 
-    This improves scaling/sharpness for the native dialog.
-    Failure is intentionally ignored because Windows versions
-    differ in available DPI APIs.
+    Failure is intentionally ignored because Windows
+    versions differ in available DPI APIs.
     """
 
     if user32 is not None:
@@ -126,9 +163,10 @@ def _set_windows_dpi_awareness():
                 ctypes.c_void_p,
             ]
 
-            set_context.restype = wintypes.BOOL
+            set_context.restype = (
+                wintypes.BOOL
+            )
 
-            # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
             set_context(
                 ctypes.c_void_p(-4)
             )
@@ -141,16 +179,18 @@ def _set_windows_dpi_awareness():
             shcore.SetProcessDpiAwareness(
                 ctypes.c_int(2)
             )
+
         except Exception:
             pass
 
 
 def _select_folder_windows():
     """
-    Open the native Windows Explorer-style folder picker.
+    Open the native Windows Explorer-style
+    folder picker.
 
     Returns:
-        Absolute folder path, or None when the user cancels.
+        Absolute folder path, or None when cancelled.
     """
 
     if ole32 is None:
@@ -162,7 +202,7 @@ def _select_folder_windows():
 
     result = ole32.CoInitializeEx(
         None,
-        0x2,  # COINIT_APARTMENTTHREADED
+        0x2,
     )
 
     com_initialized = result in (
@@ -188,30 +228,34 @@ def _select_folder_windows():
         hr = ole32.CoCreateInstance(
             ctypes.byref(clsid),
             None,
-            0x1,  # CLSCTX_INPROC_SERVER
+            0x1,
             ctypes.byref(iid),
             ctypes.byref(dialog),
         )
 
         if hr != 0:
             raise RuntimeError(
-                f"Unable to create Windows folder dialog. HRESULT: {hr}"
+                "Unable to create Windows folder dialog. "
+                f"HRESULT: {hr}"
             )
 
-        # IFileDialog::SetOptions
+        # IFileDialog::GetOptions
         get_options = _get_com_method(
             dialog,
             10,
-            wintypes.HRESULT,
+            ctypes.c_long,
             [
-                ctypes.POINTER(wintypes.DWORD),
+                ctypes.POINTER(
+                    wintypes.DWORD
+                ),
             ],
         )
 
+        # IFileDialog::SetOptions
         set_options = _get_com_method(
             dialog,
             9,
-            wintypes.HRESULT,
+            ctypes.c_long,
             [
                 wintypes.DWORD,
             ],
@@ -226,7 +270,8 @@ def _select_folder_windows():
 
         if hr != 0:
             raise RuntimeError(
-                f"Unable to read Windows dialog options. HRESULT: {hr}"
+                "Unable to read Windows dialog options. "
+                f"HRESULT: {hr}"
             )
 
         new_options = (
@@ -243,29 +288,36 @@ def _select_folder_windows():
 
         if hr != 0:
             raise RuntimeError(
-                f"Unable to configure Windows folder dialog. HRESULT: {hr}"
+                "Unable to configure Windows folder dialog. "
+                f"HRESULT: {hr}"
             )
 
         # IFileDialog::SetTitle
         set_title = _get_com_method(
             dialog,
             17,
-            wintypes.HRESULT,
+            ctypes.c_long,
             [
                 wintypes.LPCWSTR,
             ],
         )
 
-        set_title(
+        hr = set_title(
             dialog,
             "Select DATAGIT Project Folder",
         )
+
+        if hr != 0:
+            raise RuntimeError(
+                "Unable to set Windows folder dialog title. "
+                f"HRESULT: {hr}"
+            )
 
         # IModalWindow::Show
         show = _get_com_method(
             dialog,
             3,
-            wintypes.HRESULT,
+            ctypes.c_long,
             [
                 wintypes.HWND,
             ],
@@ -276,22 +328,24 @@ def _select_folder_windows():
             None,
         )
 
-        # HRESULT_FROM_WIN32(ERROR_CANCELLED)
         if hr == 0x800704C7:
             return None
 
         if hr != 0:
             raise RuntimeError(
-                f"Windows folder dialog failed. HRESULT: {hr}"
+                "Windows folder dialog failed. "
+                f"HRESULT: {hr}"
             )
 
         # IFileDialog::GetResult
         get_result = _get_com_method(
             dialog,
             20,
-            wintypes.HRESULT,
+            ctypes.c_long,
             [
-                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(
+                    ctypes.c_void_p
+                ),
             ],
         )
 
@@ -304,17 +358,20 @@ def _select_folder_windows():
 
         if hr != 0:
             raise RuntimeError(
-                f"Unable to retrieve selected folder. HRESULT: {hr}"
+                "Unable to retrieve selected folder. "
+                f"HRESULT: {hr}"
             )
 
         # IShellItem::GetDisplayName
         get_display_name = _get_com_method(
             shell_item,
             5,
-            wintypes.HRESULT,
+            ctypes.c_long,
             [
                 wintypes.DWORD,
-                ctypes.POINTER(wintypes.LPWSTR),
+                ctypes.POINTER(
+                    wintypes.LPWSTR
+                ),
             ],
         )
 
@@ -326,14 +383,21 @@ def _select_folder_windows():
             ctypes.byref(path_ptr),
         )
 
-        if hr != 0 or not path_ptr.value:
+        if hr != 0:
             raise RuntimeError(
-                "Unable to read selected folder path."
+                "Unable to read selected folder path. "
+                f"HRESULT: {hr}"
+            )
+
+        if not path_ptr.value:
+            raise RuntimeError(
+                "Windows returned an empty folder path."
             )
 
         return path_ptr.value
 
     finally:
+
         if path_ptr:
             try:
                 ole32.CoTaskMemFree(
@@ -342,8 +406,13 @@ def _select_folder_windows():
             except Exception:
                 pass
 
-        _release_com_object(shell_item)
-        _release_com_object(dialog)
+        _release_com_object(
+            shell_item
+        )
+
+        _release_com_object(
+            dialog
+        )
 
         if com_initialized:
             try:
@@ -356,14 +425,14 @@ def _select_folder_windows():
 # PROJECT FOLDER SELECTION
 # ============================================================
 
-@router.get("/select-folder")
+@router.get(
+    "/select-folder",
+)
 def select_project_folder():
-    """
-    Open the native Windows folder-selection dialog.
-    """
-
     try:
-        selected_path = _select_folder_windows()
+        selected_path = (
+            _select_folder_windows()
+        )
 
         return {
             "path": selected_path,
@@ -391,18 +460,76 @@ def select_project_folder():
 def create_project(
     project_data: ProjectCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     try:
         return ProjectService.create_project(
             db=db,
-            user_id=None,
+            user_id=current_user.id,
             project_data=project_data,
         )
+
+    except ProjectConflictError as error:
+        detail = {
+            "code": error.code,
+            "message": error.message,
+        }
+
+        if error.project_id is not None:
+            detail["project_id"] = (
+                error.project_id
+            )
+
+        raise HTTPException(
+            status_code=409,
+            detail=detail,
+        ) from error
 
     except ValueError as error:
         raise HTTPException(
             status_code=400,
             detail=str(error),
+        ) from error
+
+
+# ============================================================
+# CLAIM LEGACY PROJECT
+# ============================================================
+
+@router.post(
+    "/claim-legacy",
+    response_model=ProjectResponse,
+)
+def claim_legacy_project(
+    request: ClaimLegacyProjectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    try:
+        return ProjectService.claim_legacy_project(
+            db=db,
+            user_id=current_user.id,
+            project_path=request.path,
+        )
+
+    except ProjectConflictError as error:
+        detail = {
+            "code": error.code,
+            "message": error.message,
+        }
+
+        if error.project_id is not None:
+            detail["project_id"] = (
+                error.project_id
+            )
+
+        raise HTTPException(
+            status_code=409,
+            detail=detail,
         ) from error
 
 
@@ -416,10 +543,13 @@ def create_project(
 )
 def get_projects(
     db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     return ProjectService.get_projects(
         db=db,
-        user_id=None,
+        user_id=current_user.id,
     )
 
 
@@ -434,10 +564,13 @@ def get_projects(
 def get_project(
     project_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     project = ProjectService.get_project(
         db=db,
-        user_id=None,
+        user_id=current_user.id,
         project_id=project_id,
     )
 
@@ -448,6 +581,12 @@ def get_project(
         )
 
     return project
+
+
+# ============================================================
+# DELETE PROJECT
+# ============================================================
+
 @router.delete(
     "/{project_id}",
     status_code=204,
@@ -455,10 +594,13 @@ def get_project(
 def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     deleted = ProjectService.delete_project(
         db=db,
-        user_id=None,
+        user_id=current_user.id,
         project_id=project_id,
     )
 

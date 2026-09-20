@@ -47,15 +47,6 @@ from app.db import user_models
 # ============================================================
 # OPTIONAL DATASET PREPARATION ROUTER
 # ============================================================
-#
-# Dataset preparation currently imports scikit-learn.
-# On this Windows machine, Application Control is blocking
-# one of scikit-learn's native DLLs.
-#
-# We keep the rest of DATAGIT available so the API can start.
-# The dataset-preparation router is included only when its
-# dependencies can be imported successfully.
-# ============================================================
 
 dataset_preparation_router = None
 
@@ -65,7 +56,8 @@ try:
     )
 except Exception as exc:
     print(
-        "[WARNING] Dataset preparation router could not be loaded."
+        "[WARNING] Dataset preparation router "
+        "could not be loaded."
     )
     print(
         f"[WARNING] Reason: {exc}"
@@ -76,7 +68,7 @@ except Exception as exc:
 
 
 # ============================================================
-# SMALL SQLite MIGRATION
+# SQLITE MIGRATION
 # ============================================================
 
 def ensure_project_user_id_column():
@@ -89,10 +81,13 @@ def ensure_project_user_id_column():
 
     columns = {
         column["name"]
-        for column in inspector.get_columns("projects")
+        for column in inspector.get_columns(
+            "projects"
+        )
     }
 
     if "user_id" not in columns:
+
         if engine.dialect.name != "sqlite":
             raise RuntimeError(
                 "The existing database needs a migration "
@@ -112,24 +107,105 @@ ensure_project_user_id_column()
 
 
 # ============================================================
-# CREATE DATABASE TABLES
+# DATABASE TABLES
 # ============================================================
 
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(
+    bind=engine
+)
 
 
 # ============================================================
 # FASTAPI APPLICATION
 # ============================================================
 
-app = FastAPI(
+fastapi_app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
 )
 
 
 # ============================================================
+# ROUTERS
+# ============================================================
+
+fastapi_app.include_router(
+    auth_router
+)
+
+fastapi_app.include_router(
+    projects_router
+)
+
+fastapi_app.include_router(
+    datasets_router
+)
+
+fastapi_app.include_router(
+    models_router
+)
+
+fastapi_app.include_router(
+    status_router
+)
+
+if dataset_preparation_router is not None:
+    fastapi_app.include_router(
+        dataset_preparation_router
+    )
+
+fastapi_app.include_router(
+    version_comparison_router
+)
+
+fastapi_app.include_router(
+    version_history_router
+)
+
+fastapi_app.include_router(
+    version_report_router
+)
+
+fastapi_app.include_router(
+    versions_router
+)
+
+fastapi_app.include_router(
+    evidence_router
+)
+
+fastapi_app.include_router(
+    runs_router
+)
+
+fastapi_app.include_router(
+    comparison_router
+)
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@fastapi_app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "application": settings.app_name,
+        "dataset_preparation_available": (
+            dataset_preparation_router is not None
+        ),
+    }
+
+
+# ============================================================
 # CORS
+#
+# Wrap the complete application.
+# This guarantees CORS headers are still attached to
+# unexpected 500 responses so the browser exposes the
+# actual backend error instead of only saying:
+# "Network Error".
 # ============================================================
 
 default_origins = (
@@ -147,88 +223,11 @@ allowed_origins = [
     if origin.strip()
 ]
 
-app.add_middleware(
-    CORSMiddleware,
+
+app = CORSMiddleware(
+    app=fastapi_app,
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-
-# ============================================================
-# HEALTH CHECK
-# ============================================================
-
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok",
-        "application": settings.app_name,
-        "dataset_preparation_available": (
-            dataset_preparation_router is not None
-        ),
-    }
-
-
-# ============================================================
-# AUTHENTICATION
-# ============================================================
-
-app.include_router(
-    auth_router
-)
-
-
-# ============================================================
-# API ROUTERS
-# ============================================================
-
-app.include_router(
-    projects_router
-)
-
-app.include_router(
-    datasets_router
-)
-
-app.include_router(
-    models_router
-)
-
-app.include_router(
-    status_router
-)
-
-if dataset_preparation_router is not None:
-    app.include_router(
-        dataset_preparation_router
-    )
-
-app.include_router(
-    version_comparison_router
-)
-
-app.include_router(
-    version_history_router
-)
-
-app.include_router(
-    version_report_router
-)
-
-app.include_router(
-    versions_router
-)
-
-app.include_router(
-    evidence_router
-)
-
-app.include_router(
-    runs_router
-)
-
-app.include_router(
-    comparison_router
 )

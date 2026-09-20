@@ -13,34 +13,61 @@ from app.services.git_service import GitService
 class VersionService:
 
     @staticmethod
+    def _get_owned_project(
+        db: Session,
+        project_id: int,
+        user_id: int,
+    ) -> Project | None:
+
+        return (
+            db.query(Project)
+            .filter(
+                Project.id == project_id,
+                Project.user_id == user_id,
+            )
+            .first()
+        )
+
+    @staticmethod
     def finalize_version(
         db: Session,
+        user_id: int,
         project_id: int,
         description: str,
         preparation_operations: list[dict] | None = None,
         result_evidence: dict | None = None,
     ) -> Version:
+
         project = (
-            db.query(Project)
-            .filter(Project.id == project_id)
-            .first()
+            VersionService._get_owned_project(
+                db=db,
+                project_id=project_id,
+                user_id=user_id,
+            )
         )
 
         if not project:
-            raise ValueError("Project not found.")
+            raise ValueError(
+                "Project not found."
+            )
 
-        git_commit = GitService.get_current_commit(
-            project.path
+        git_commit = (
+            GitService.get_current_commit(
+                project.path
+            )
         )
 
-        dvc_state = DVCService.get_state(
-            project.path
+        dvc_state = (
+            DVCService.get_state(
+                project.path
+            )
         )
 
         existing_versions = (
             db.query(Version)
             .filter(
-                Version.project_id == project_id
+                Version.project_id
+                == project_id
             )
             .order_by(
                 Version.version_number.asc()
@@ -48,7 +75,13 @@ class VersionService:
             .all()
         )
 
-        for existing_version in existing_versions:
+        # ----------------------------------------------------
+        # Prevent duplicate Git + DVC state.
+        # ----------------------------------------------------
+
+        for existing_version in (
+            existing_versions
+        ):
             if (
                 existing_version.git_commit
                 == git_commit
@@ -56,26 +89,34 @@ class VersionService:
                 == dvc_state
             ):
                 raise ValueError(
-                    "This Git + DVC state is already finalized as "
-                    f"DataGit Version {existing_version.version_number}."
+                    "This Git + DVC state is already "
+                    "finalized as DataGit Version "
+                    f"{existing_version.version_number}."
                 )
 
-        version_number = (
-            1
-            if not existing_versions
-            else existing_versions[-1].version_number + 1
-        )
+        # ----------------------------------------------------
+        # Version numbering starts at 1 for every project.
+        # ----------------------------------------------------
+
+        if not existing_versions:
+            version_number = 1
+        else:
+            version_number = (
+                existing_versions[-1].version_number
+                + 1
+            )
 
         version = Version(
             project_id=project_id,
             version_number=version_number,
             git_commit=git_commit,
             dvc_state=dvc_state,
-            description=description,
+            description=description.strip(),
             ml_run_id=None,
         )
 
         db.add(version)
+
         db.flush()
 
         preparation_evidence = (
@@ -83,15 +124,19 @@ class VersionService:
                 version_id=version.id,
                 operations=(
                     preparation_operations
-                    if preparation_operations is not None
+                    if preparation_operations
+                    is not None
                     else []
                 ),
             )
         )
 
-        db.add(preparation_evidence)
+        db.add(
+            preparation_evidence
+        )
 
         if result_evidence:
+
             db.add(
                 VersionResultEvidence(
                     version_id=version.id,
@@ -123,6 +168,7 @@ class VersionService:
             )
 
         db.commit()
+
         db.refresh(version)
 
         return version
@@ -130,12 +176,28 @@ class VersionService:
     @staticmethod
     def get_versions(
         db: Session,
+        user_id: int,
         project_id: int,
     ):
+
+        project = (
+            VersionService._get_owned_project(
+                db=db,
+                project_id=project_id,
+                user_id=user_id,
+            )
+        )
+
+        if not project:
+            raise ValueError(
+                "Project not found."
+            )
+
         return (
             db.query(Version)
             .filter(
-                Version.project_id == project_id
+                Version.project_id
+                == project_id
             )
             .order_by(
                 Version.version_number.asc()
@@ -146,14 +208,28 @@ class VersionService:
     @staticmethod
     def get_version(
         db: Session,
+        user_id: int,
         project_id: int,
         version_id: int,
     ):
+
+        project = (
+            VersionService._get_owned_project(
+                db=db,
+                project_id=project_id,
+                user_id=user_id,
+            )
+        )
+
+        if not project:
+            return None
+
         return (
             db.query(Version)
             .filter(
                 Version.id == version_id,
-                Version.project_id == project_id,
+                Version.project_id
+                == project_id,
             )
             .first()
         )
