@@ -104,7 +104,79 @@ def ensure_project_user_id_column():
             )
 
 
+def ensure_user_oauth_columns():
+    inspector = inspect(engine)
+
+    tables = inspector.get_table_names()
+
+    if "users" not in tables:
+        return
+
+    columns = {
+        column["name"]
+        for column in inspector.get_columns(
+            "users"
+        )
+    }
+
+    # The current DATAGIT database is SQLite.
+    # Keep the migration explicit for other databases.
+    if engine.dialect.name != "sqlite":
+        missing_columns = (
+            {
+                "google_id",
+                "github_id",
+            }
+            - columns
+        )
+
+        if missing_columns:
+            raise RuntimeError(
+                "The existing database needs a migration "
+                "for users OAuth columns: "
+                f"{sorted(missing_columns)}"
+            )
+
+        return
+
+    with engine.begin() as connection:
+
+        if "google_id" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN google_id VARCHAR(255)"
+                )
+            )
+
+        if "github_id" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN github_id VARCHAR(255)"
+                )
+            )
+
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ix_users_google_id "
+                "ON users (google_id)"
+            )
+        )
+
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ix_users_github_id "
+                "ON users (github_id)"
+            )
+        )
+
+
 ensure_project_user_id_column()
+
+ensure_user_oauth_columns()
 
 
 # ============================================================
