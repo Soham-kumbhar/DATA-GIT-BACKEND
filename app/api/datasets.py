@@ -1,9 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+)
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user
 from app.db.database import get_db
-from app.schemas.dataset import DatasetCreate, DatasetResponse
-from app.services.dataset_service import DatasetService
+from app.db.user_models import User
+from app.db.models import Project
+from app.schemas.dataset import (
+    DatasetCreate,
+    DatasetResponse,
+)
+from app.services.dataset_service import (
+    DatasetService,
+)
 
 
 router = APIRouter(
@@ -11,6 +23,10 @@ router = APIRouter(
     tags=["Datasets"],
 )
 
+
+# ============================================================
+# CREATE DATASET
+# ============================================================
 
 @router.post(
     "",
@@ -21,7 +37,26 @@ def create_dataset(
     project_id: int,
     dataset_data: DatasetCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
+
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found.",
+        )
+
     try:
         return DatasetService.create_dataset(
             db,
@@ -33,8 +68,12 @@ def create_dataset(
         raise HTTPException(
             status_code=400,
             detail=str(error),
-        )
+        ) from error
 
+
+# ============================================================
+# GET ALL DATASETS FOR PROJECT
+# ============================================================
 
 @router.get(
     "",
@@ -43,8 +82,36 @@ def create_dataset(
 def get_datasets(
     project_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    return DatasetService.get_datasets(
-        db,
-        project_id,
+
+    # Never allow one user to read another user's
+    # project datasets.
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id,
+        )
+        .first()
     )
+
+    if project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found.",
+        )
+
+    try:
+        return DatasetService.get_datasets(
+            db,
+            project_id,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
