@@ -32,6 +32,13 @@ class LoginRequest(BaseModel):
     )
 
 
+class OAuthExchangeRequest(BaseModel):
+    ticket: str = Field(
+        min_length=1,
+        max_length=4096,
+    )
+
+
 class UserResponse(BaseModel):
     id: int
     name: str
